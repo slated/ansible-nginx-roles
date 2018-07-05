@@ -1,0 +1,27 @@
+---
+
+- name: Create the Nginx configuration file
+  template: src={{ nginx_site_template }}
+            dest=/etc/nginx/sites-available/{{ nginx_server_name }}
+            backup=yes
+  notify: Reload Nginx
+
+- name: Ensure that the application site is enabled
+  file: src=/etc/nginx/sites-available/{{ nginx_server_name }}
+        dest=/etc/nginx/sites-enabled/{{ nginx_server_name }}
+        state=link
+  notify: Reload Nginx
+
+- name: Ensure Nginx service is started
+  service: name=nginx state=started enabled=yes
+
+- name: Update httpauth file
+  lineinfile:
+    dest: '{{ nginx_restricted_file_path }}'
+    regexp: .*
+    line: '{{ nginx_restricted_auth }}'
+    create: yes
+    mode: 0660
+    owner: www-data
+  when: nginx_restricted_auth != ''
+  notify: Reload Nginx

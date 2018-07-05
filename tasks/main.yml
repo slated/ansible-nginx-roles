@@ -1,0 +1,10 @@
+# tasks file for nginx
+---
+
+- import_tasks: build.yml
+  become: yes
+  tags: [nginx, build]
+
+- import_tasks: deploy.yml
+  become: yes
+  tags: [nginx, deploy]

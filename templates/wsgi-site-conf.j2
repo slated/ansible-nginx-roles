@@ -1,0 +1,90 @@
+upstream {{ nginx_wsgi_app }}-wsgi {
+  {{ nginx_load_balancing_algorithm | default("ip_hash") }};
+{% for server in nginx_wsgi_servers %}
+  server {{ server }}:{{ nginx_wsgi_port }};
+{% endfor %}
+}
+
+server {
+    listen      80;
+    server_name {{ nginx_server_name }}  {{ nginix_extra_server_names }};
+    rewrite     ^ https://$server_name$request_uri? permanent;
+}
+
+server {
+    listen              443;
+    server_name         {{ nginx_server_name }} {{ nginix_extra_server_names }};
+    ssl on;
+{% if nginx_use_letsencrypt %}
+    ssl_certificate     {{ nginx_certbot_live_dir }}/{{ nginx_certbot_cert_filename }};
+    ssl_certificate_key {{ nginx_certbot_live_dir }}/{{ nginx_certbot_privkey_filename }};
+{% else %}
+    ssl_certificate     {{ nginx_ssl_dest_dir }}/{{ nginx_server_name }}.crt;
+    ssl_certificate_key {{ nginx_ssl_dest_dir }}/{{ nginx_server_name }}.key;
+{% endif %}
+    ssl_protocols       TLSv1 TLSv1.1 TLSv1.2;
+    ssl_ciphers         'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:AES:CAMELLIA:DES-CBC3-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA';
+    ssl_prefer_server_ciphers on;
+{% if nginx_strong_dh_group %}
+    ssl_dhparam          /etc/ssl/certs/dhparams.pem;
+{% endif %}
+
+    client_max_body_size 4G;
+
+    access_log {{ nginx_log_dir }}/{{ nginx_server_name }}_access.log;
+    error_log {{ nginx_log_dir }}/{{ nginx_server_name }}_error.log;
+
+{% if nginx_serve_media %}
+    location /media/ {
+        alias   {{ nginx_media_dir }}/;
+        autoindex off;
+    }
+{% endif %}
+    
+{% if nginx_serve_static %}
+    location /static/ {
+        alias   {{ nginx_static_dir }}/;
+        autoindex off;
+        access_log      off;
+        log_not_found   off;
+        expires         7d;
+    }
+{% endif %}
+
+    location / {
+        if (-f {{ nginx_static_dir }}/maintenance_on.html) {
+            return 503;
+        }
+
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header Host $http_host;
+        proxy_redirect off;
+
+        uwsgi_pass {{ nginx_wsgi_app }}-wsgi;
+        include uwsgi_params;
+    }
+
+    error_page 503 /maintenance_on.html;
+    location = /maintenance_on.html {
+        root {{ nginx_static_dir }}/;
+    }
+{% for proxy in nginx_http_proxies %}
+    location /{{ proxy.path }}/ {
+        rewrite ^/{{ proxy.path }}/(.*)$ /$1 break;
+        proxy_pass http://{{ proxy.address }}:{{ proxy.port }};
+        proxy_set_header Host $host;
+        proxy_redirect off;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        access_log off;
+
+{% if nginx_restricted_auth %}
+        auth_basic "Restricted Content";
+        auth_basic_user_file {{ nginx_restricted_file_path }};
+{% endif %}
+    }
+{% endfor %}
+}
