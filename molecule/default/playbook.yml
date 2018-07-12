@@ -1,5 +1,5 @@
 ---
 - name: Converge
   hosts: all
-  roles:
-    - role: ansible-nginx-roles
+  role:
+    - role: ansible-nginx-role

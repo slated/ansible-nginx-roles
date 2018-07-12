@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/slated/ansible-nginx-roles.svg?branch=master)](https://travis-ci.org/slated/ansible-nginx-roles)
+[![Build Status](https://travis-ci.org/slated/ansible-nginx-role.svg?branch=master)](https://travis-ci.org/slated/ansible-nginx-role)
 
 Role Name
 =========
