@@ -12,9 +12,6 @@
         state=link
   notify: Reload Nginx
 
-- name: check nginx
-  command: nginx -t
-
 - name: Ensure Nginx service is started
   service: name=nginx state=started enabled=yes
 
