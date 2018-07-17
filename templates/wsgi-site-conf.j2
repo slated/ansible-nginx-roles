@@ -1,75 +1,303 @@
+# define upstream endpoints
+# uwsgi - handles HTTP requests - django
 upstream {{ nginx_wsgi_app }}-wsgi {
-  {{ nginx_load_balancing_algorithm | default("ip_hash") }};
-{% for server in nginx_wsgi_servers %}
-  server {{ server }}:{{ nginx_wsgi_port }};
-{% endfor %}
+    {{ nginx_load_balancing_algorithm | default("ip_hash") }};
+    {% for server in nginx_wsgi_servers %}
+      server {{ server }}:{{ nginx_wsgi_port }};
+    {% endfor %}
 }
 
-server {
-    listen      80;
-    server_name {{ nginx_server_name }}  {{ nginix_extra_server_names }};
-    rewrite     ^ https://$server_name$request_uri? permanent;
+{% if upstream_asgi_servers %}
+# asgi / Daphne - Django Channels HTTP/WebSocket server
+upstream {{ nginx_wsgi_app }}-asgi {
+    {{ nginx_load_balancing_algorithm | default("ip_hash") }};
+    {% for server in nginx_wsgi_servers %}
+      server {{ server }}:{{ nginx_asgi_port }};
+    {% endfor %}
 }
+{% endif %}
 
+# combined + upstream metrics
+log_format upstream_time '$remote_addr - $remote_user [$time_local] '
+                         '"$request" $status $body_bytes_sent '
+                         '"$http_referer" "$http_user_agent" '
+                         'rt=$request_time uct="$upstream_connect_time" uht="$upstream_header_time" urt="$upstream_response_time"';
+
+# Drop requests for unknown hosts
 server {
-    listen              443;
-    server_name         {{ nginx_server_name }} {{ nginix_extra_server_names }};
-    ssl on;
-{% if nginx_use_letsencrypt %}
-    ssl_certificate     {{ nginx_certbot_live_dir }}/{{ nginx_certbot_cert_filename }};
-    ssl_certificate_key {{ nginx_certbot_live_dir }}/{{ nginx_certbot_privkey_filename }};
-{% else %}
-    ssl_certificate     {{ nginx_ssl_dest_dir }}/{{ nginx_server_name }}.crt;
-    ssl_certificate_key {{ nginx_ssl_dest_dir }}/{{ nginx_server_name }}.key;
-{% endif %}
-    ssl_protocols       TLSv1 TLSv1.1 TLSv1.2;
-    ssl_ciphers         'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:AES:CAMELLIA:DES-CBC3-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA';
-    ssl_prefer_server_ciphers on;
-{% if nginx_strong_dh_group %}
-    ssl_dhparam          /etc/ssl/certs/dhparams.pem;
-{% endif %}
-
-    client_max_body_size 4G;
+    listen  80 default_server;
+    listen 443 default_server ssl;
 
     access_log {{ nginx_log_dir }}/{{ nginx_server_name }}_access.log;
-    error_log {{ nginx_log_dir }}/{{ nginx_server_name }}_error.log;
+    error_log  {{ nginx_log_dir }}/{{ nginx_server_name }}_error.log;
 
-{% if nginx_serve_media %}
-    location /media/ {
-        alias   {{ nginx_media_dir }}/;
-        autoindex off;
+    # SSL config
+    {% if nginx_use_letsencrypt %}
+    ssl_certificate     {{ letsencrypt_dir }}/{{ letsencrypt_cert_filename|default('fullchain.pem') }};
+    ssl_certificate_key {{ letsencrypt_dir }}/{{ letsencrypt_privkey_filename|default('privkey.pem') }};
+    {% else %}
+    ssl_certificate      {{ nginx_ssl_dest_dir }}/{{ nginx_server_name }}.crt;
+    ssl_certificate_key  {{ nginx_ssl_dest_dir }}/{{ nginx_server_name }}.key;
+    {% endif %}
+    ssl_protocols        TLSv1 TLSv1.1 TLSv1.2;
+    ssl_session_cache    shared:SSL:10m;
+    ssl_session_timeout  10m;
+    ssl_ciphers {{ nginx_ssl_ciphers }};
+    ssl_prefer_server_ciphers on;
+    # stronger key for key-exchange (Diffie Hellman)
+    {% if nginx_strong_dh_group %}
+    ssl_dhparam          /etc/ssl/certs/dhparams.pem;
+    {% endif %}
+
+    # return 'no response' for unknown hosts
+    return 444;
+}
+
+# redirect from HTTP to HTTPS
+server {
+    listen 80;
+    server_name {{ nginx_server_name }} www.{{ nginx_server_name }} *.{{ nginx_server_name }};
+
+    access_log {{ nginx_log_dir }}/{{ nginx_server_name }}_access.log;
+    error_log  {{ nginx_log_dir }}/{{ nginx_server_name }}_error.log;
+
+    return 301 https://$host$request_uri;
+}
+
+# redirect from apex (base) domain to www.
+server {
+    listen 443 ssl;
+    server_name {{ nginx_server_name }};
+
+    access_log {{ nginx_log_dir }}/{{ nginx_server_name }}_access.log;
+    error_log  {{ nginx_log_dir }}/{{ nginx_server_name }}_error.log;
+
+    # SSL config
+    {% if nginx_use_letsencrypt %}
+    ssl_certificate     {{ letsencrypt_dir }}/{{ letsencrypt_cert_filename|default('fullchain.pem') }};
+    ssl_certificate_key {{ letsencrypt_dir }}/{{ letsencrypt_privkey_filename|default('privkey.pem') }};
+    {% else %}
+    ssl_certificate      {{ nginx_ssl_dest_dir }}/{{ nginx_server_name }}.crt;
+    ssl_certificate_key  {{ nginx_ssl_dest_dir }}/{{ nginx_server_name }}.key;
+    {% endif %}
+    ssl_protocols        TLSv1 TLSv1.1 TLSv1.2;
+    ssl_session_cache    shared:SSL:10m;
+    ssl_session_timeout  10m;
+    ssl_ciphers {{ nginx_ssl_ciphers }};
+    ssl_prefer_server_ciphers on;
+    # stronger key for key-exchange (Diffie Hellman)
+    {% if nginx_strong_dh_group %}
+    ssl_dhparam          /etc/ssl/certs/dhparams.pem;
+    {% endif %}
+
+    # HTTPS
+    # HSTS header to tell web browsers that the site should be accessed trough https only (valid 1 year)
+    add_header Strict-Transport-Security max-age=31536000;
+
+    # redirect to www.
+    return 301 https://www.{{ nginx_server_name }}$request_uri;
+}
+
+# handle all subdomains (apex is redirected to www.)
+server {
+    listen 443 ssl http2;
+    server_name www.{{ nginx_server_name }} *.{{ nginx_server_name }};
+    client_max_body_size  16M;
+    uwsgi_read_timeout    900s;
+    keepalive_timeout     300s; # Use a higher keepalive timeout to reduce the need for repeated handshakes
+
+    access_log {{ nginx_log_dir }}/{{ nginx_server_name }}_access.log upstream_time;
+    error_log  {{ nginx_log_dir }}/{{ nginx_server_name }}_error.log;
+
+    # SSL config
+    {% if nginx_use_letsencrypt %}
+    ssl_certificate     {{ letsencrypt_dir }}/{{ letsencrypt_cert_filename|default('fullchain.pem') }};
+    ssl_certificate_key {{ letsencrypt_dir }}/{{ letsencrypt_privkey_filename|default('privkey.pem') }};
+    {% else %}
+    ssl_certificate      {{ nginx_ssl_dest_dir }}/{{ nginx_server_name }}.crt;
+    ssl_certificate_key  {{ nginx_ssl_dest_dir }}/{{ nginx_server_name }}.key;
+    {% endif %}
+    ssl_protocols        TLSv1 TLSv1.1 TLSv1.2;
+    ssl_session_cache    shared:SSL:10m;
+    ssl_session_timeout  24h;
+    ssl_ciphers {{ nginx_ssl_ciphers }};
+    ssl_prefer_server_ciphers on;
+
+    # stronger key for key-exchange (Diffie Hellman)
+    {% if nginx_strong_dh_group %}
+    ssl_dhparam          /etc/ssl/certs/dhparams.pem;
+    {% endif %}
+
+    # HSTS header to tell web browsers that the site should be accessed trough https only (valid 1 year)
+    add_header Strict-Transport-Security max-age=31536000;
+
+    # REDIRECTS
+    # Redirections at various levels of gnarliness:
+    # 1. Redirect analytics.slated.com and advisors.slated.com to /about (served by Django), unless
+    # 2. The uri is /about (to avoid redir loop) or /favicon, /static/... (for static content)
+    # 3. www.slated.com/about, www.slated.com/services, ... redir to various unbounce urls
+    # 4. Try not to get carried away with expensive regex processing
+
+    # create domain_top, path_top, domain_path_top strings
+    if ($host ~* ^([^.]*).*$) { # match first part of host, before first dot: (www).domain.tld
+        set $domain_top $1;     # ex: www
+    }
+    if ($request_uri ~* ^(/[^/]*).*$) { # match part of request until first slash: (/about)/company/
+        set $path_top $1;       # ex: /about
+    }
+    set $domain_path_top $domain_top$path_top; # ex: www/about
+
+    # handle this case first, avoid hijacking below
+    if ($domain_path_top = www/about) {
+        return https://welcome.slated.com/;
+    }
+
+    # about, static, favicon serve normally, esp about, to avoid redir loop
+    if ($path_top = /about) {
+        set $domain_top www;
+    }
+    if ($path_top = /static) {
+        # these serve normally, even for special subdomains, to avoid redir loop
+        set $domain_top www;
+    }
+    if ($path_top = /favicon.ico) {
+        # these serve normally, even for special subdomains, to avoid redir loop
+        set $domain_top www;
+    }
+
+    # redirect to about page based on subdomain
+    # ex: analytics.slated.com -> https://analytics.slated.com/about/
+    if ($domain_top = analytics) {
+        return https://$host/about/;
+    }
+    if ($domain_top = advisors) {
+        return https://$host/about/;
+    }
+
+    # LANDING PAGES
+    # path redirects to services.slated.com (external service unbounce) (on sites like slated.com)
+    location ~ ^/services/analysis/(script|financial)/?$ {
+         rewrite ^/services/analysis/(script|financial)/?$ https://services.slated.com/$1-analysis/ break;
+    }
+    location ~ ^/services/analysis/?$ {
+         rewrite ^/services/analysis/?$ https://services.slated.com/script-analysis/ break;
+    }
+    location ~ ^/services/(basic|executive-producer)/?$ {
+         rewrite ^/services/(basic|executive-producer)/?$ https://services.slated.com/$1/ break;
+    }
+    location ~ ^/syndicate/?$ {
+         rewrite ^/syndicate/?$ https://services.slated.com/executive-producer/ break;
+    }
+    location ~ ^/analysis/(script|financial)/?$ {
+         rewrite ^/analysis/(script|financial)/?$ https://services.slated.com/$1-analysis/ break;
+    }
+    location ~ ^/services/?$ {
+         rewrite ^/services/?$ https://services.slated.com/basic/ break;
+    }
+    location ~ ^/analysis/?$ {
+         rewrite ^/analysis/?$ https://services.slated.com/script-analysis/ break;
+    }
+
+    # LOCATIONS
+    # default location
+    location / {
+        # # maintenance page short-circuit
+        # if (-f {{ nginx_static_dir }}/maintenance_on.html) {
+        #     return 503;
+        # }
+
+        proxy_redirect      off;
+        proxy_set_header    Host                  $http_host;
+        proxy_set_header    X-Real-IP             $remote_addr;
+        proxy_set_header    X-Forwarded-For       $proxy_add_x_forwarded_for;
+        proxy_set_header    X-Forwarded-Protocol  $scheme;
+
+        # pass request to uwsgi
+        uwsgi_pass {{ nginx_wsgi_app }}-wsgi;
+        include uwsgi_params;
+      }
+
+{% if upstream_asgi_servers %}
+    # websockets / daphne
+    location = /websocket {
+        proxy_pass          http://{{ nginx_wsgi_app }}-asgi;
+        proxy_http_version  1.1;
+
+        proxy_set_header    Host            $http_host;
+        proxy_set_header    Upgrade         $http_upgrade;
+        proxy_set_header    Connection      "upgrade";
+        proxy_set_header    X-Real-IP       $remote_addr;
+        proxy_set_header    X-Forwarded-For $proxy_add_x_forwarded_for;
+
+        allow all;
+        auth_basic off;
+
+        # Prevents 502 bad gateway error
+        proxy_buffering off;
+        proxy_buffers 8 32k;
+        proxy_buffer_size 64k;
     }
 {% endif %}
-    
+
+{% if nginx_serve_media %}
+    # django uploaded content
+    location /media/ {
+        alias           {{ nginx_media_dir }}/;
+        autoindex       off;
+    }
+{% endif %}
+
 {% if nginx_serve_static %}
+    # django static assests (.css, .js)
     location /static/ {
-        alias   {{ nginx_static_dir }}/;
-        autoindex off;
+        root            {{ nginx_static_dir }}/;
+        autoindex       off;
+        access_log      off;
+        log_not_found   on;
+        expires         7d;
+    }
+
+    location /robots.txt {
+        root            {{ nginx_static_dir }}/;
+        access_log      off;
+        log_not_found   off;
+        expires         1h;
+    }
+
+    location /favicon.ico {
+        root            {{ nginx_static_dir }}/;
         access_log      off;
         log_not_found   off;
         expires         7d;
     }
 {% endif %}
 
-    location / {
-        if (-f {{ nginx_static_dir }}/maintenance_on.html) {
-            return 503;
-        }
-
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto https;
-        proxy_set_header Host $http_host;
-        proxy_redirect off;
-
-        uwsgi_pass {{ nginx_wsgi_app }}-wsgi;
-        include uwsgi_params;
+    # angular snippets - needed for front-end
+    location ~ ^/people/(\d+)/settings/(email|match|transaction|match)?/?$ {
+        alias           {{ nginx_static_dir }}/static/n;
+        try_files       /index.html /index.html;
     }
 
+    location ~ ^/people/(\d+)/(message|track|untrack)?/?$ {
+        alias           {{ nginx_static_dir }}/static/n;
+        try_files       /index.html /index.html;
+    }
+
+    # error handling
     error_page 503 /maintenance_on.html;
+    error_page 403 /403.html;
+
     location = /maintenance_on.html {
         root {{ nginx_static_dir }}/;
     }
+
+    location = /403.html {
+        root {{ nginx_static_dir }}/;
+    }
+
 {% for proxy in nginx_http_proxies %}
+    # PROXIES
+    # flower (celery monitor), maillog
     location /{{ proxy.path }}/ {
         rewrite ^/{{ proxy.path }}/(.*)$ /$1 break;
         proxy_pass http://{{ proxy.address }}:{{ proxy.port }};
@@ -81,10 +309,17 @@ server {
 
         access_log off;
 
-{% if nginx_restricted_auth %}
+        {% if nginx_restricted_auth %}
         auth_basic "Restricted Content";
         auth_basic_user_file {{ nginx_restricted_file_path }};
-{% endif %}
+        {% endif %}
     }
 {% endfor %}
+
+{% if nginx_restricted_auth and nginx_restricted_auth_all %}
+    # user authentication - site wide
+    auth_basic "Restricted Content";
+    auth_basic_user_file {{ nginx_restricted_file_path }};
+{% endif %}
+
 }

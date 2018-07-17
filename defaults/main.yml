@@ -1,10 +1,10 @@
 ---
 
-nginx_server_name: 'test.slated.com'
-nginix_extra_server_names:
+nginx_server_name:
 nginx_ssl_dest_dir: /etc/ssl
-nginx_strong_dh_group: no  # Strongly recomended in production. See weakdh.org.
+nginx_strong_dh_group: yes  # Strongly recomended in production. See weakdh.org.
 nginx_log_dir: /var/log/nginx
+nginx_ssl_ciphers: 'ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256'
 
 # nginx file serving
 nginx_serve_static: no
@@ -14,76 +14,25 @@ nginx_media_dir:
 
 # wsgi config
 nginx_wsgi_app: webapp
-nginx_wsgi_port: 10000
 nginx_wsgi_servers:
-  - localhost
+  - { host: localhost, port: 10000 }
 nginx_site_template: wsgi-site-conf.j2
 
-# Only used when nginx_use_letsencrypt is set to no/false. This is just for testing
-nginx_ssl_crt: |
-  -----BEGIN CERTIFICATE-----
-  MIIDLjCCAhYCCQCMKxAr5okqHzANBgkqhkiG9w0BAQsFADBZMQswCQYDVQQGEwJV
-  UzELMAkGA1UECAwCQ0ExEjAQBgNVBAcMCVNhbiBEaWVnbzEPMA0GA1UECgwGU2xh
-  dGVkMRgwFgYDVQQDDA90ZXN0LnNsOGRhbC5jb20wHhcNMTgwNjE5MDk1NzA1WhcN
-  MTkwNjE5MDk1NzA1WjBZMQswCQYDVQQGEwJVUzELMAkGA1UECAwCQ0ExEjAQBgNV
-  BAcMCVNhbiBEaWVnbzEPMA0GA1UECgwGU2xhdGVkMRgwFgYDVQQDDA90ZXN0LnNs
-  OGRhbC5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCXYdPeYTIi
-  RqDa2l1ooRU4pMOjTIolNRSJC6bzeCokq22tZ5PvooA0fJtsMvbF2XnkT7qn0RbX
-  3Cq8jt5cA8ft8RYinbrcAinU938FUDfmMOHu03GGrUpSk3qQIiPwGvuvZhIbhnwH
-  DAHwtnj9l9tToWNrhh/JIUVUmDK7h5eivFlknBArTuG3HFYYx7misn0kBHUUX8rE
-  9in8/CqfCziTqv4cltwyiFI4j9scARxwDp2wwN/Nq2OKrcuxdPQ13Pi3+ju1lo+k
-  UBzPiJ1JemMnaAkkU2OFQaQB6mwaMWpI9o0YE4dcQk7KJXSCxnYw+/+9srxA2IbU
-  3ddYoqdQzm5RAgMBAAEwDQYJKoZIhvcNAQELBQADggEBAHHpP9fkEJePQ4fY0PCU
-  uwRfl/WJ7fNBJWPsUEiGG2FoCZ2CDwNVv1Qn70fisIbYS9tUZ8fDz5Di+iMWOBGo
-  KcXVEz7p5UFE6vZQ4eZOFv5KIb44+AGBNd0Vs2UQGdWkTEBnOXFm5UhhF5gnv3kT
-  TF8vQvhAy4irTd6wyx609eB4sC8xyXBe6thlCM3D+9+oih4L2cN0tGGILshEaYfk
-  79rTBP4KWWaIzFupkdG9cDPmYcBsKWdqGRNxcRBIYl4USo43g6FmXopmsv3dcxv3
-  uo45LEQtlFVNExTQ8t+OJzNIYXJDCTqOMgI1q93I6AVeYKmLFmoIg8GFs2NQ3L1L
-  9x0=
-  -----END CERTIFICATE-----
-nginx_ssl_key: |
-  -----BEGIN PRIVATE KEY-----
-  MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCXYdPeYTIiRqDa
-  2l1ooRU4pMOjTIolNRSJC6bzeCokq22tZ5PvooA0fJtsMvbF2XnkT7qn0RbX3Cq8
-  jt5cA8ft8RYinbrcAinU938FUDfmMOHu03GGrUpSk3qQIiPwGvuvZhIbhnwHDAHw
-  tnj9l9tToWNrhh/JIUVUmDK7h5eivFlknBArTuG3HFYYx7misn0kBHUUX8rE9in8
-  /CqfCziTqv4cltwyiFI4j9scARxwDp2wwN/Nq2OKrcuxdPQ13Pi3+ju1lo+kUBzP
-  iJ1JemMnaAkkU2OFQaQB6mwaMWpI9o0YE4dcQk7KJXSCxnYw+/+9srxA2IbU3ddY
-  oqdQzm5RAgMBAAECggEAKqdz7Trxx1qjREc2/p40voseXMraOfWk3aCc4AlBxqdO
-  9gczVdgxy5g4qtoJUmIeyEf2zgZKK3RrzklrOf4OvWqq1AIhfpBVfR5nefXKal/n
-  qUWGvW3ifTX02NvlyGex9xAJlhvkoo+tlEe1+65oLD5TJx7ZofBv+pAP62sfPMjq
-  bxYA9HLuzOYbJaMXptHe+LkEKUNcymGcKseYkKF9zUEfMQkvOQBbcV3BzRNPfT9L
-  4Tpuxu5/4N/pISSQtSrU5TcP+HsOfSGfbYZyDNM+GKM6F/vvYrZIM8odoIx1Zu9F
-  zR3C5PfjOBsnf1wnZ1D7HIcSTc+RT0FL+DZDH6+2gQKBgQDFOOrmLhh96YHFywBB
-  RdjYxnlf3P2oN8BNTNsS+AdrSMFM5qcawy1FJqSfBNG1V2P4d6REs6EjuXLXq023
-  nftLpLyo+5449/4/cMvNih0dDxYGy6WowOmqf6DIiGFRYTtimx0IsEdMPiRqAX9B
-  OBSp1gxHCF5e/2llsrPFNbbuGQKBgQDEf4gEYrGIw9vxRHWvu+dXhtQTKSNxvg8l
-  6JyYjOVE1utntIf4otmPv9vw8JodXQ6q3z7SCXgzroT7t6nUydnwgXRYM6z96uWy
-  BHYdTxvoy+pGENaprar5utFecBiaZaDe9JTlnFTz2hO7+d25ZuroB/L/5aG708FQ
-  GxMvxNKY+QKBgQCKziVc/YJVU/v25on2Zp9Y6k9QbevE8gARJ49kSVaHZnxNkGR5
-  zHZXHfxswuqJc8kzfZkKlVZLG2E9cx5OpgzQT1BMqlLQi5HQuqVlstgMtKpu+/NK
-  0wNh8VOK75l2ujUekEcd71suyOm+BfG3SC4a3kBj2fr5Z0+ZuO0XVle6OQKBgGKy
-  hAlf4TiG2DSpZEtuoFawXFl7clgxVL5/xhhBvO8E3JzsateSRKEVh03QLDjPgwyE
-  sbMiGoQrBpTAvccp1BQfkeaznhK0J8dwwjsafzRBKF0lHA2CM7zX/03mFBWJMnKK
-  ezeRfII3aW4jpSD49sixJXcvSjtjs1efIdX+kKFRAoGAH4rXKh0+arBuRoYGXnz4
-  bz7YnI2j3LuTxwjROLOoIEiYJPsuqPlolo47mh3qUCkHZ0LNEvdoLtvCdKKwb9CS
-  BSJfIdz9cAZSm02U26vnjxSohjHrlnpAT4i8nnKvtU8nU87fRhlR8FkyHrbT/cFU
-  /PaSDc2Vah2H4FHklcxcxGE=
-  -----END PRIVATE KEY-----
+# Only used when nginx_use_letsencrypt is set to no/false
+nginx_ssl_crt:
+nginx_ssl_key:
 
 # Only used when nginx_use_letsencrypt is set to yes/true. The 'certbot' role will automatically generate these files.
-nginx_use_letsencrypt: no
-nginx_certbot_live_dir: '/etc/letsencrypt/live/{{ nginx_server_name }}'
-nginx_certbot_cert_filename: fullchain.pem
-nginx_certbot_privkey_filename: privkey.pem
+nginx_use_letsencrypt: yes
+letsencrypt_dir: '/etc/letsencrypt/live/{{ nginx_server_name }}'
+letsencrypt_cert_filename: fullchain.pem
+letsencrypt_privkey_filename: privkey.pem
 
 # extra conf at end of site file
 # [{address: 127.0.0.1, port: 8000, path: 'debug'}]
 nginx_http_proxies:
-  - address: '127.0.0.1'
-    port: '5555'
-    path: '__flower__'
 
 # htpass for restricted content; only deployed if nginx_restricted_auth set
 nginx_restricted_file_path: /etc/nginx/.htpasswd
-nginx_restricted_auth: ''
+nginx_restricted_auth_all: no
+nginx_restricted_auth:
