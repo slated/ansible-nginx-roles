@@ -1,3 +1,4 @@
+#jinja2: lstrip_blocks: True
 # define upstream endpoints
 # uwsgi - handles HTTP requests - django
 upstream {{ nginx_wsgi_app }}-wsgi {
@@ -108,6 +109,8 @@ server {
 
     access_log {{ nginx_log_dir }}/{{ nginx_server_name }}_access.log upstream_time;
     error_log  {{ nginx_log_dir }}/{{ nginx_server_name }}_error.log;
+    # error_log  {{ nginx_log_dir }}/{{ nginx_server_name }}_error.log notice;
+    # rewrite_log on;
 
     # SSL config
     {% if nginx_use_letsencrypt %}
@@ -168,11 +171,29 @@ server {
     # redirect to about page based on subdomain
     # ex: analytics.slated.com -> https://analytics.slated.com/about/
     if ($domain_top = analytics) {
-        return https://$host/about/;
+        return https://analytics.{{ nginx_server_name }}/about/;
     }
     if ($domain_top = advisors) {
-        return https://$host/about/;
+        return https://advisors.{{ nginx_server_name }}/about/;
     }
+
+    # ALLAUTH support redirects
+    rewrite ^/account/disable/?$            https://$host/   last;
+    rewrite ^/account/disable/(.*)$         https://$host/$1 last;
+    rewrite ^/account/link_accounts/?$      https://$host/   last;
+    rewrite ^/account/link_accounts/(.*)$   https://$host/$1 last;
+    rewrite ^/account/logged_in/?$          https://$host/   last;
+    rewrite ^/account/logged_in/(.*)$       https://$host/$1 last;
+    rewrite ^/account/enable/confirm/?$     https://$host/accounts/disabled/   last;
+    rewrite ^/account/enable/confirm/(.*)$  https://$host/accounts/disabled/$1 last;
+    rewrite ^/account/reenable/?$           https://$host/accounts/disabled/   last;
+    rewrite ^/account/reenable/(.*)$        https://$host/accounts/disabled/$1 last;
+    rewrite ^/accounts/invited/?$           https://$host/   last;
+    rewrite ^/accounts/invited/(.*)$        https://$host/$1 last;
+    rewrite ^/activate/?$                   https://$host/   last;
+    rewrite ^/activate/(.*)$                https://$host/$1 last;
+    rewrite ^/accounts/login/?$             https://$host/login/   last;
+    rewrite ^/accounts/signup/?$            https://$host/register/   last;
 
     # LANDING PAGES
     # path redirects to services.slated.com (external service unbounce) (on sites like slated.com)
@@ -201,10 +222,12 @@ server {
     # LOCATIONS
     # default location
     location / {
-        # # maintenance page short-circuit
-        # if (-f {{ nginx_static_dir }}/maintenance_on.html) {
-        #     return 503;
-        # }
+        {% if nginx_maintenance %}
+        # maintenance page short-circuit
+        if (-f {{ nginx_static_dir }}/static/maintenance_page/index.html) {
+            return 503;
+        }
+        {% endif %}
 
         proxy_redirect      off;
         proxy_set_header    Host                  $http_host;
@@ -215,11 +238,11 @@ server {
         # pass request to uwsgi
         uwsgi_pass {{ nginx_wsgi_app }}-wsgi;
         include uwsgi_params;
-      }
+    }
 
 {% if upstream_asgi_servers %}
     # websockets / daphne
-    location = /websocket {
+    location = /websocket/ {
         proxy_pass          http://{{ nginx_wsgi_app }}-asgi;
         proxy_http_version  1.1;
 
@@ -284,11 +307,11 @@ server {
     }
 
     # error handling
-    error_page 503 /maintenance_on.html;
+    error_page 503 /maintenance_page/index.html;
     error_page 403 /403.html;
 
-    location = /maintenance_on.html {
-        root {{ nginx_static_dir }}/;
+    location = /maintenance_page/index.html {
+        root {{ nginx_static_dir }}/static/;
     }
 
     location = /403.html {
