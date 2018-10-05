@@ -1,23 +1,32 @@
 ---
 
 - name: Fail if nginx_server_name is not set
-  fail: msg="Set nginx_server_name is required"
+  fail:
+    msg: "Set nginx_server_name is required"
   when: not nginx_server_name
 
 - name: Fail if no SSL config
-  fail: msg="Either nginx_use_letsencrypt or valid ssl_crt and ssl_key required"
+  fail:
+    msg: "Either nginx_use_letsencrypt or valid ssl_crt and ssl_key required"
   when: not nginx_use_letsencrypt and not (nginx_ssl_crt and nginx_ssl_key)
 
 - name: Install Nginx
-  apt: name=nginx update_cache=yes state=present
+  apt:
+    name: nginx
+    update_cache: yes
+    state: present
 
 - name: Copy the SSL certificate to the remote server
-  copy: content={{ nginx_ssl_crt }} dest={{ nginx_ssl_dest_dir }}/{{ nginx_server_name }}.crt
+  copy:
+    content: '{{ nginx_ssl_crt }}'
+    dest: '{{ nginx_ssl_dest_dir }}/{{ nginx_server_name }}.crt'
   notify: Restart Nginx
   when: not nginx_use_letsencrypt and nginx_ssl_crt
 
 - name: Copy the SSL private key to the remote server
-  copy: content={{ nginx_ssl_key }} dest={{ nginx_ssl_dest_dir }}/{{ nginx_server_name }}.key
+  copy:
+    content: '{{ nginx_ssl_key }}'
+    dest: '{{ nginx_ssl_dest_dir }}/{{ nginx_server_name }}.key'
   notify: Restart Nginx
   when: not nginx_use_letsencrypt and nginx_ssl_key
 
@@ -26,5 +35,7 @@
   when: nginx_strong_dh_group is defined and nginx_strong_dh_group
 
 - name: Ensure that the default site is disabled
-  file: path=/etc/nginx/sites-enabled/default state=absent
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
   notify: Reload Nginx

@@ -237,6 +237,8 @@ server {
 
         # pass request to uwsgi
         uwsgi_pass {{ nginx_wsgi_app }}-wsgi;
+        uwsgi_read_timeout {{ nginx_wsgi_read_timeout }}s;
+        uwsgi_send_timeout {{ nginx_wsgi_send_timeout }}s;
         include uwsgi_params;
     }
 
