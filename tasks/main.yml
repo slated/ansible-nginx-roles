@@ -7,4 +7,4 @@
 
 - import_tasks: deploy.yml
   become: yes
-  tags: [nginx, deploy]
+  tags: [nginx, config]
