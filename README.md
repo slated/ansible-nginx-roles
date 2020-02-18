@@ -17,7 +17,7 @@ Role Variables
 Template for site conf file:
 
     nginx_site_template: wsgi-site-conf.j2
-    
+
 Set site domain, must be a single non-wildcard DNS domain:
 
     nginx_server_name:
@@ -47,15 +47,18 @@ Ssl setup (if not using certbot); note: `ssl_key` should be kept secret!
     nginx_ssl_key: |
       -----BEGIN PRIVATE KEY-----
       ...
-      
+
 Upstream wsgi upstream name (`{{ nginx_wsgi_app }}-wsgi`) and servers
-(for wsgi-site-conf template). 
+(for wsgi-site-conf template).
 
     nginx_wsgi_app: webapp
     nginx_wsgi_port: 10000
     nginx_wsgi_servers:
       - localhost
       - server
+    nginx_wsgi_servers_heavy:
+      - localhost
+      - server-heavy
 
 Static file service, if Nginx is serving Django collectstatic files directly:
 
@@ -96,5 +99,8 @@ Example Playbook
           nginx_server_name: my.domain.com
           nginx_use_letsencrypt: yes
           nginx_wsgi_servers:
+            - { host: app1, port: 10000 }
+            - { host: app2, port: 10000 }
+          nginx_wsgi_servers_heavy:
             - { host: app1, port: 10000 }
             - { host: app2, port: 10000 }

@@ -10,6 +10,8 @@
     nginx_restricted_auth: ''
     nginx_wsgi_servers:
       - localhost
+    nginx_wsgi_servers_heavy:
+      - localhost
     nginx_http_proxies:
       - address: '127.0.0.1'
         port: '5555'

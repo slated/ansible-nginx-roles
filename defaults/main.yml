@@ -17,6 +17,8 @@ nginx_media_dir:
 nginx_wsgi_app: webapp
 nginx_wsgi_servers:
   - { host: localhost, port: 10000 }
+nginx_wsgi_servers_heavy:
+  - { host: localhost, port: 10000 }
 nginx_site_template: wsgi-site-conf.j2
 nginx_wsgi_read_timeout: 120
 nginx_wsgi_send_timeout: 120
