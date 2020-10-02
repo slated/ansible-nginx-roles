@@ -10,6 +10,10 @@
     msg: "Either nginx_use_letsencrypt or valid ssl_crt and ssl_key required"
   when: not nginx_use_letsencrypt and not (nginx_ssl_crt and nginx_ssl_key)
 
+- name: Install nginx ppa
+  apt_repository:
+    repo: ppa:ondrej/nginx
+
 - name: Install Nginx
   apt:
     name: nginx
