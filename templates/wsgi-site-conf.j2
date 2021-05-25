@@ -6,6 +6,9 @@ upstream {{ nginx_wsgi_app }}-wsgi {
     {% for server in nginx_wsgi_servers %}
       server {{ server }}:{{ nginx_wsgi_port }};
     {% endfor %}
+    {% for server in nginx_wsgi_servers_heavy %}
+      server {{ server }}:{{ nginx_wsgi_port }};
+    {% endfor %}
 }
 
 upstream {{ nginx_wsgi_app }}-wsgi-heavy {
